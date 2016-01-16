@@ -1,0 +1,430 @@
+  <!doctype html>
+  <html>
+  <canvas width = "950" height = "580" >  </canvas>
+ 	 <head>
+ 	 <script>
+ function toRad(angle) {
+ 	return Math.PI * angle / 180;
+ }
+
+ function toDeg(angle) {
+ 	return 180 * angle / Math.PI;
+ }
+
+ function getAngle(sideX, sideY) {
+ 	var angle = Math.atan(sideY / sideX);
+ 	if (sideX < 0) {
+ 		angle += Math.PI;
+ 	}
+ 	if (angle < 0) {
+ 		angle += 2 * Math.PI;
+ 	}
+ 	angle = toDeg(angle);
+ 	return angle;
+ }
+
+ function createMap(n, rIndex) {
+ 	var map = [];
+ 	for (var i = 0; i < n; i++) {
+ 		map[i] = [];
+ 		for (var j = 0; j < n; j++)
+ 			if (Math.random() > rIndex) {
+ 				map[i][j] = 10;
+ 			} else {
+ 				map[i][j] = 0;
+ 			}
+ 	}
+ 	return map;
+ }
+
+ function drawMap(cx, map, cellSize) {
+ 	cx.strokeStyle = "grey";
+ 	cx.fillStyle = "grey";
+ 	cx.lineWidth = 1;
+ 	for (var i = 0; i < map.length; i++)
+ 		for (var j = 0; j < map[i].length; j++)
+ 			if (map[i][j] > 0) {
+ 				cx.fillRect(i * cellSize, j * cellSize, cellSize, cellSize);
+ 			} else {
+ 				cx.strokeRect(i * cellSize, j * cellSize, cellSize, cellSize);
+ 			}
+ }
+
+ function Point(x, y) {
+ 	this.x = x;
+ 	this.y = y;
+ 	this.parent = null;
+ 	this.G = 0;
+ 	this.H = 0;
+ 	this.F = 0;
+
+ 	this.calcH = function (ex, ey) {
+ 		this.H = Math.sqrt((ex - this.x) * (ex - this.x) + (ey - this.y) * (ey - this.y));
+ 	}
+
+ 	this.calcF = function () {
+ 		this.F = this.G + this.H;
+ 	}
+ }
+
+ function searchPath(x0, y0, x, y, map) {
+ 	var openList = {};
+ 	var closeList = {};
+ 	var step = 0;
+ 	var FMin = Infinity;
+ 	var newPoint = new Point(x0, y0);
+ 	var curPoint = null;
+ 	newPoint.calcH(x, y);
+ 	newPoint.calcF();
+ 	var tKey = 'key' + newPoint.x + newPoint.y;
+ 	openList[tKey] = newPoint;
+ 	var count = 1;
+ 	var complete = false;
+ 	while ((count > 0) && (!complete)) {
+ 		FMin = Infinity;
+ 		curPoint = null;
+ 		for (var key in openList) {
+ 			if (openList[key].F < FMin) {
+ 				FMin = openList[key].F;
+ 				curPoint = openList[key];
+ 			}
+ 		}
+ 		tKey = 'key' + curPoint.x + curPoint.y;
+ 		closeList[tKey] = curPoint;
+ 		delete openList[tKey];
+ 		for (var i = curPoint.x - 1; i < curPoint.x + 2; i++)
+ 			for (var j = curPoint.y - 1; j < curPoint.y + 2; j++) {
+ 				if ((map[i] === undefined) || (map[i][j] === undefined)) {
+ 					continue;
+ 				}
+ 				if (map[i][j] > 0) {
+ 					continue;
+ 				}
+ 				if (!((curPoint.x == i) || (curPoint.y == j))) {
+ 					if ((map[curPoint.x][j] > 0) || (map[i][curPoint.y] > 0)) { // || РЅР° &&
+ 						continue;
+ 					}
+ 				}
+ 				if ((i == curPoint.x) && (j == curPoint.y)) {
+ 					continue;
+ 				} else if (!complete) {
+ 					complete = (i == x) && (j == y);
+ 				} else
+ 					break;
+ 				tKey = 'key' + i + j;
+ 				if (tKey in closeList) {
+ 					continue;
+ 				}
+ 				if (tKey in openList) {
+ 					if ((curPoint.x == openList[tKey].x) ||
+ 						(curPoint.y == openList[tKey].y)) {
+ 						step = 1;
+ 					} else {
+ 						step = 1.41;
+ 					}
+ 					if (openList[tKey].G > curPoint.G + step) {
+ 						openList[tKey].parent = curPoint;
+ 						openList[tKey].G = curPoint.G + step;
+ 						openList[tKey].calcF();
+ 					}
+ 				} else {
+ 					if ((curPoint.x == i) ||
+ 						(curPoint.y == j)) {
+ 						step = 1;
+ 					} else {
+ 						step = 1.41;
+ 					}
+ 					newPoint = new Point(i, j);
+ 					newPoint.parent = curPoint;
+ 					newPoint.G = curPoint.G + step;
+ 					newPoint.calcH(x, y);
+ 					newPoint.calcF();
+ 					openList[tKey] = newPoint;
+ 					count++;
+ 				}
+ 			}
+ 	}
+ 	// return openList['key' + x + y ];
+ 	var cur = openList['key' + x + y];
+ 	var path = {};
+ 	while (cur.parent) {
+ 		path['key' + cur.x + cur.y] = cur;
+ 		cur = cur.parent;
+ 	}
+ 	return path;
+ }
+
+ function Tank(x, y, tankAngle, towerAngle, color) {
+ 	this.x = x;
+ 	this.y = y;
+ 	this.tankAngle = tankAngle;
+ 	this.towerAngle = towerAngle;
+ 	this.color = color;
+ 	this.path = null;
+ 	this.tmp = null;
+
+ 	this.drawTower = function drawTower(cx, scale) {
+ 		var r = scale * 1.41;
+ 		var u = toRad(this.towerAngle - 90);
+ 		var x = this.x;
+ 		var y = this.y;
+ 		cx.strokeStyle = this.color;
+ 		cx.lineWidth = 2;
+ 		cx.beginPath();
+ 		cx.moveTo(x + r * Math.cos(toRad(135) + u),
+ 			y + r * Math.sin(toRad(135) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(45) + u),
+ 			y + r * Math.sin(toRad(45) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-45) + u),
+ 			y + r * Math.sin(toRad(-45) + u));
+ 		r = scale * 1.58;
+ 		cx.lineTo(x + r * Math.cos(toRad(-71.57) + u),
+ 			y + r * Math.sin(toRad(-71.57) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-108.43) + u),
+ 			y + r * Math.sin(toRad(-108.43) + u));
+ 		r = scale * 1.41;
+ 		cx.lineTo(x + r * Math.cos(toRad(-135) + u),
+ 			y + r * Math.sin(toRad(-135) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(135) + u),
+ 			y + r * Math.sin(toRad(135) + u));
+ 		cx.stroke();
+ 		cx.lineWidth = 3;
+ 		cx.beginPath();
+ 		r = scale;
+ 		cx.moveTo(x + r * Math.cos(Math.PI / 2 + u),
+ 			y + r * Math.sin(Math.PI / 2 + u));
+ 		r = scale * 3;
+ 		cx.lineTo(x + r * Math.cos(Math.PI / 2 + u),
+ 			y + r * Math.sin(Math.PI / 2 + u));
+ 		cx.stroke();
+ 		cx.lineWidth = 5;
+ 		cx.beginPath();
+ 		r = scale * 3;
+ 		cx.moveTo(x + r * Math.cos(Math.PI / 2 + u),
+ 			y + r * Math.sin(Math.PI / 2 + u));
+ 		r = scale * 4;
+ 		cx.lineTo(x + r * Math.cos(Math.PI / 2 + u),
+ 			y + r * Math.sin(Math.PI / 2 + u));
+ 		cx.stroke();
+ 	}
+
+ 	this.drawTank = function (cx, scale) {
+ 		var r = scale * 2.92;
+ 		var u = toRad(this.tankAngle - 90);
+ 		var x = this.x;
+ 		var y = this.y;
+ 		cx.strokeStyle = this.color;
+ 		cx.lineWidth = 2;
+ 		cx.beginPath();
+ 		cx.moveTo(x + r * Math.cos(toRad(120.96) + u),
+ 			y + r * Math.sin(toRad(120.96) + u));
+ 		r = scale * 3;
+ 		cx.lineTo(x + r * Math.cos(toRad(90) + u),
+ 			y + r * Math.sin(toRad(90) + u));
+ 		r = scale * 2.92;
+ 		cx.lineTo(x + r * Math.cos(toRad(59.04) + u),
+ 			y + r * Math.sin(toRad(59.04) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-59.04) + u),
+ 			y + r * Math.sin(toRad(-59.04) + u));
+ 		r = scale * 3.16;
+ 		cx.lineTo(x + r * Math.cos(toRad(-71.57) + u),
+ 			y + r * Math.sin(toRad(-71.57) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-108.43) + u),
+ 			y + r * Math.sin(toRad(-108.43) + u));
+ 		r = scale * 2.92;
+ 		cx.lineTo(x + r * Math.cos(toRad(-120.96) + u),
+ 			y + r * Math.sin(toRad(-120.96) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(120.96) + u),
+ 			y + r * Math.sin(toRad(120.96) + u));
+ 		cx.stroke();
+ 		cx.strokeStyle = this.color;
+ 		cx.lineWidth = 2;
+ 		cx.beginPath();
+ 		r = scale * 2.5;
+ 		cx.moveTo(x + r * Math.cos(toRad(53.13) + u),
+ 			y + r * Math.sin(toRad(53.13) + u));
+ 		r = scale * 2.82;
+ 		cx.lineTo(x + r * Math.cos(toRad(45) + u),
+ 			y + r * Math.sin(toRad(45) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-45) + u),
+ 			y + r * Math.sin(toRad(-45) + u));
+ 		r = scale * 2.5;
+ 		cx.lineTo(x + r * Math.cos(toRad(-53.13) + u),
+ 			y + r * Math.sin(toRad(-53.13) + u));
+ 		cx.moveTo(x + r * Math.cos(toRad(126.87) + u),
+ 			y + r * Math.sin(toRad(126.87) + u));
+ 		r = scale * 2.82;
+ 		cx.lineTo(x + r * Math.cos(toRad(135) + u),
+ 			y + r * Math.sin(toRad(135) + u));
+ 		cx.lineTo(x + r * Math.cos(toRad(-135) + u),
+ 			y + r * Math.sin(toRad(-135) + u));
+ 		r = scale * 2.5;
+ 		cx.lineTo(x + r * Math.cos(toRad(-126.87) + u),
+ 			y + r * Math.sin(toRad(-126.87) + u));
+ 		cx.stroke();
+ 	}
+
+ 	this.drawPath = function (cx, pathColor, cellSize) {
+ 		if (this.path === null)
+ 			return;
+ 		var key = 'key' + Math.floor(this.x / cellSize)
+ 			 + Math.floor(this.y / cellSize);
+ 		if (this.path[key] === undefined) {
+ 			return;
+ 		}
+ 		var cur = this.path[key].parent;
+ 		if ((cur === null) || (cur === undefined)) {
+ 			return;
+ 		}
+ 		while (cur) {
+ 			cx.strokeStyle = pathColor;
+ 			cx.lineWidth = 4;
+ 			cx.strokeRect(cellSize / 3 + cellSize * cur.x,
+ 				cellSize / 3 + cellSize * cur.y, cellSize / 3, cellSize / 3);
+ 			cur = cur.parent;
+ 		}
+ 	}
+
+ 	this.upgradeStats = function (speed, rotTank, rotTower) {
+ 		this.x += speed * Math.cos(toRad(this.tankAngle));
+ 		this.y += speed * Math.sin(toRad(this.tankAngle));
+ 		this.tankAngle += rotTank;
+ 		if (this.tankAngle > 360) {
+ 			this.tankAngle -= 360;
+ 		}
+ 		if (this.tankAngle < 0) {
+ 			this.tankAngle += 360;
+ 		}
+ 		this.towerAngle += rotTower;
+ 		if (this.towerAngle > 360) {
+ 			this.towerAngle -= 360;
+ 		}
+ 		if (this.towerAngle < 0) {
+ 			this.towerAngle += 360;
+ 		}
+ 	}
+
+ 	this.calcMove = function (cellSize, map) {
+ 		var kx = Math.floor(this.x / cellSize);
+ 		var ky = Math.floor(this.y / cellSize);
+ 		var key = 'key' + kx + ky;
+ 		var rez = {};
+ 		rez.speed = 0;
+ 		rez.rot = 0;
+ 		var u0 = this.tankAngle;
+ 		if (!(this.tmp === null)) {
+ 			var r = Math.sqrt((this.tmp.x - this.x) * (this.tmp.x - this.x) +
+ 					(this.tmp.y - this.y) * (this.tmp.y - this.y));
+ 		}
+ 		if (this.path === null) {
+ 			return rez;
+ 		}
+ 		var pt0 = this.path[key];
+ 		if ((this.tmp === null) || (r < 4.2) || (!(pt0 === undefined))) {
+ 			if ((pt0 === undefined) || (pt0.parent === null)) {
+ 				return rez;
+ 			}
+ 			var pt1 = pt0.parent;
+ 			var end = pt1;
+ 			var temp = {};
+ 			temp.x = cellSize / 2 + cellSize * end.x;
+ 			temp.y = cellSize / 2 + cellSize * end.y;
+ 			this.tmp = temp;
+ 		}
+ 		var u1 = getAngle(this.tmp.x - this.x, this.tmp.y - this.y);
+ 		if ((Math.abs(u1 - u0) < 4) ||
+ 			((Math.abs(u1 - u0) > 356) && (Math.abs(u1 - u0) < 364))) {
+ 			rez.rot = 0;
+ 			rez.speed = 2.1;
+ 			return rez;
+ 		}
+ 		if (u1 > u0) {
+ 			rez.rot = 4;
+ 			if (Math.abs(u1 - u0) > 180) {
+ 				rez.rot = -4;
+ 			}
+ 		} else {
+ 			rez.rot =  - 4;
+ 			if (Math.abs(u1 - u0) > 180) {
+ 				rez.rot = 4;
+ 			}
+ 		}
+ 		rez.speed = 2.1;
+ 		if (Math.abs(u1 - u0) > 50) {
+ 			rez.speed = 0;
+ 		}
+ 		return rez;
+ 	}
+
+ 	this.calcTowerRot = function (xt, yt) {
+ 		var u0 = this.towerAngle;
+ 		var u1 = getAngle(xt - this.x, yt - this.y);
+ 		if ((Math.abs(u1 - u0) < 5) ||
+ 			((Math.abs(u1 - u0) > 355) && (Math.abs(u1 - u0) < 365))) {
+ 			return 0;
+ 		}
+ 		if (u1 > u0) {
+ 			return 4;
+ 			if (Math.abs(u1 - u0) > 180) {
+ 				return -4;
+ 			}
+ 		} else {
+ 			return  - 4;
+ 			if (Math.abs(u1 - u0) > 180) {
+ 				return 4;
+ 			}
+ 		}
+ 	}
+
+ }
+
+ var canvas = document.querySelector("canvas");
+ var cx = canvas.getContext("2d");
+
+ canvas.onmousedown = handleMousedown;
+
+ var tank = new Tank(330, 210, 0, 0, 'blue');
+
+ var map = createMap(20, 0.8);
+
+ var ex, ey;
+
+ var lastTime = null;
+ function frame(time) {
+ 	if (lastTime != null)
+ 		updateAnimation(Math.min(100, time - lastTime) / 1000);
+ 	lastTime = time;
+ 	requestAnimationFrame(frame);
+ }
+
+ requestAnimationFrame(frame);
+
+ function updateAnimation(step) {
+ 	var upg = tank.calcMove(60, map);
+ 	twRot = tank.calcTowerRot(ex, ey);
+ 	tank.upgradeStats(upg.speed, upg.rot, twRot);
+ 	cx.clearRect(0, 0, cx.canvas.width, cx.canvas.height);
+ 	drawMap(cx, map, 60);
+ 	tank.drawTank(cx, 8);
+ 	tank.drawTower(cx, 7.6);
+ 	tank.drawPath(cx, 'yellow', 60)
+ }
+
+ function handleMousedown(e) {
+ 	ex = e.pageX;
+ 	ey = e.pageY;
+ 	var endX = Math.floor(ex / 60);
+ 	var endY = Math.floor(ey / 60);
+ 	var startX = Math.floor(tank.x / 60);
+ 	var startY = Math.floor(tank.y / 60);
+ 	try {
+ 		tank.path = searchPath(endX, endY, startX, startY, map);
+ 	} catch (err) {
+ 		alert('РџСѓС‚Рё РЅРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚. \n' + err);
+ 	}
+ }
+
+ </script>
+ </head>
+
+ </html>
