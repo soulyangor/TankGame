@@ -1,0 +1,209 @@
+<!DOCTYPE HTML>
+<html>
+
+<canvas width="1000" height="1000"></canvas>
+
+<head>
+  <meta charset="utf-8">
+</head>
+
+<body>
+
+  <script>
+       function Point( x, y ){
+           this.x = x; 
+           this.y = y;
+           this.parent = null;
+           this.G = 0;  
+           this.H = 0;
+           this.F = 0;  
+           this.calcH = function ( ex, ey ){ 
+               this.H = Math.sqrt( ( ex - this.x )*( ex - this.x ) + ( ey - this.y )*( ey - this.y ) );
+           }
+           this.calcF = function ( ){ this.F = this.G + this.H; }
+       }
+
+       function createMap( n ){
+           var map = [];
+           for ( var i = 0; i < n; i++ ){
+               map[i] = [];
+               for ( var j = 0; j < n; j++ ){
+                   if ( Math.random() > 0.7 ) { map[i][j] = 10; } else { map[i][j] = 0; }
+               }
+           } 
+           return map;
+       }
+
+       function drawMap( cx, map, cellSize ){
+           cx.strokeStyle = "grey";
+           cx.fillStyle = "grey";
+           cx.lineWidth = 1; 
+           for ( var i = 0; i < map.length; i++ )
+               for ( var j = 0; j < map[i].length; j++ ) 
+                   if ( map[i][j] > 0 ) { 
+                       cx.fillRect( i*cellSize, j* cellSize , cellSize , cellSize );
+                   } else {
+                       cx.strokeRect ( i*cellSize, j* cellSize , cellSize , cellSize );
+                   }
+           }
+       
+       function searchPath( x0, y0, x, y, map ){
+           var openList = { };
+           var closeList = { };
+           var step = 0;
+           var FMin = Infinity;
+           var newPoint = new Point( x0, y0 );
+           var curPoint = null;
+           newPoint.calcH( x, y );
+           newPoint.calcF( );
+           var tKey = 'key'+newPoint.x+newPoint.y;
+           openList[tKey] = newPoint;
+           var  count = 1;
+           var complete = false;
+           while ( ( count > 0 ) && ( !complete ) ) {
+               FMin = Infinity;
+               curPoint = null;
+               for ( var key in openList ){
+                   if ( openList[key].F < FMin ) {
+                       FMin = openList[key].F;
+                       curPoint = openList[key];
+                   }
+               }
+               tKey = 'key' + curPoint.x + curPoint.y;
+               closeList[tKey] = curPoint;
+               delete openList[tKey];
+               for ( var i = curPoint.x - 1; i < curPoint.x + 2; i++ )
+                   for ( var j = curPoint.y - 1; j < curPoint.y + 2; j++ ){
+                       if ( ( map[i] === undefined ) || ( map[i][j] === undefined ) ) { continue; }
+                       if ( map[i][j] > 0 ) { continue; }
+                       if ( !( ( curPoint.x == i ) || ( curPoint.y == j ) ) ) {
+                           if ( ( map[curPoint.x][j] > 0 ) || ( map[i][curPoint.y] > 0 ) ) { // || на &&
+                               continue;
+                           }
+                       }
+                       if ( ( i == curPoint.x ) && ( j == curPoint.y ) ) { continue; }
+                       else if ( !complete ) { complete = ( i ==x ) && ( j==y ); }
+                       else break;
+                       tKey = 'key' + i + j;
+                       if ( tKey in closeList ) { continue; }
+                       if ( tKey in openList ) {
+                          if ( ( curPoint.x == openList[tKey].x ) ||
+                                     ( curPoint.y == openList[tKey].y ) ){
+                                   step = 1;
+                               } else {
+                                   step = 1.41;
+                               }
+                           if ( openList[tKey].G > curPoint.G + step ){
+                               openList[tKey].parent = curPoint;
+                               openList[tKey].G = curPoint.G + step;
+                               openList[tKey].calcF();
+                           }
+                       } else { 
+                           if ( ( curPoint.x == i ) ||
+                                 ( curPoint.y == j ) ){
+                                   step = 1;
+                               } else {
+                                   step = 1.41;
+                               } 
+                           newPoint = new Point( i, j );
+                           newPoint.parent = curPoint;
+                           newPoint.G = curPoint.G + step;
+                           newPoint.calcH( x, y );
+                           newPoint.calcF( );
+                           openList[tKey] = newPoint;
+                           count++;
+                       }   
+                   }
+           }
+           return openList['key' + x + y ];
+       }
+
+       var canvas = document.querySelector("canvas") ;
+       var cx = canvas.getContext("2d");
+
+       canvas.onmousedown = handleMousedown;
+
+       var map = createMap( 20 ); 
+       drawMap( cx, map, 50 );
+
+       var tick = 0;
+       var startX, startY, endX, endY;
+
+       function handleMousedown(e) {
+           tick++;
+           var ex = e.pageX;
+           var ey = e.pageY;
+           
+           if ( tick == 1 ){
+               startX = Math.floor( ex/50 );
+               startY = Math.floor( ey/50 );
+           }
+
+           if ( tick == 2 ){
+               endX = Math.floor( ex/50 );
+               endY = Math.floor( ey/50 );
+               try{
+                   var path = searchPath( startX, startY, endX, endY, map );
+                   var cur = path;
+                   while ( cur.parent ){
+                       cx.strokeStyle = "blue";
+                       cx.lineWidth = 4; 
+                       cx.strokeRect( 20 + 50*cur.x, 20 + 50*cur.y, 10, 10 );
+                       cur = cur.parent;
+                   }
+               } catch ( err ) {
+                   tick = 0;
+                   cx.clearRect(0, 0, cx.canvas.width, cx.canvas.height);
+                   drawMap( cx, map, 50 );
+                   alert( 'Пути не существует. \n' + err );
+                   return;
+               }
+           }
+
+           if ( tick == 3 ){ 
+               tick = 0;
+               cx.clearRect(0, 0, cx.canvas.width, cx.canvas.height);
+               drawMap( cx, map, 50 );
+               return;
+           }
+
+           cx.strokeStyle = "green";
+           cx.lineWidth = 4; 
+           cx.strokeRect( 20 + 50*Math.floor( ex/50 ), 
+                                       20 + 50*Math.floor( ey/50 ), 10, 10 );
+           cx.strokeRect( 10 + 50*Math.floor( ex/50 ), 
+                                       10 + 50*Math.floor( ey/50 ), 30, 30 );
+       }
+  </script>
+
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
