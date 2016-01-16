@@ -190,7 +190,7 @@
  	var curPoint = null;
  	newPoint.calcH(x, y);
  	newPoint.calcF();
- 	var tKey = 'key' + newPoint.x + newPoint.y;
+ 	var tKey = 'key' + newPoint.x +'|'+ newPoint.y;
  	openList[tKey] = newPoint;
  	var count = 1;
  	var complete = false;
@@ -203,7 +203,7 @@
  				curPoint = openList[key];
  			}
  		}
- 		tKey = 'key' + curPoint.x + curPoint.y;
+ 		tKey = 'key' + curPoint.x +'|'+ curPoint.y;
  		closeList[tKey] = curPoint;
  		delete openList[tKey];
  		for (var i = curPoint.x - 1; i < curPoint.x + 2; i++)
@@ -225,7 +225,7 @@
  					complete = (i == x) && (j == y);
  				} else
  					break;
- 				tKey = 'key' + i + j;
+ 				tKey = 'key' + i +'|'+ j;
  				if (tKey in closeList) {
  					continue;
  				}
@@ -259,10 +259,10 @@
  			}
  	}
  	// return openList['key' + x + y ];
- 	var cur = openList['key' + x + y];
+ 	var cur = openList['key' + x +'|'+ y];
  	var path = {};
  	while (cur.parent) {
- 		path['key' + cur.x + cur.y] = cur;
+ 		path['key' + cur.x +'|'+ cur.y] = cur;
  		cur = cur.parent;
  	}
  	return path;
@@ -771,7 +771,7 @@
  		if (this.path === null)
  			return;
  		var key = 'key' + Math.floor(this.x / cellSize)
- 			 + Math.floor(this.y / cellSize);
+ 			 +'|'+ Math.floor(this.y / cellSize);
  		if (this.path[key] === undefined) {
  			return;
  		}
@@ -780,7 +780,7 @@
  			return;
  		}
  		while (cur) {
- 			var strKey = 'key' + cur.x + cur.y;
+ 			var strKey = 'key' + cur.x +'|'+ cur.y;
  			if (!(strKey in cells)) {
  				var cell = {};
  				cell.i = cur.x;
@@ -860,7 +860,7 @@
  	this.calcMove = function (cellSize, map) {
  		var kx = Math.floor(this.x / cellSize);
  		var ky = Math.floor(this.y / cellSize);
- 		var key = 'key' + kx + ky;
+ 		var key = 'key' + kx +'|'+ ky;
  		var rez = {};
  		rez.speed = 0;
  		rez.rot = 0;

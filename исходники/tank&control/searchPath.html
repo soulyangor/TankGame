@@ -56,7 +56,7 @@
            var curPoint = null;
            newPoint.calcH( x, y );
            newPoint.calcF( );
-           var tKey = 'key'+newPoint.x+newPoint.y;
+           var tKey = 'key'+newPoint.x+'|'+newPoint.y;
            openList[tKey] = newPoint;
            var  count = 1;
            var complete = false;
@@ -69,7 +69,7 @@
                        curPoint = openList[key];
                    }
                }
-               tKey = 'key' + curPoint.x + curPoint.y;
+               tKey = 'key' + curPoint.x +'|'+ curPoint.y;
                closeList[tKey] = curPoint;
                delete openList[tKey];
                for ( var i = curPoint.x - 1; i < curPoint.x + 2; i++ )
@@ -84,7 +84,7 @@
                        if ( ( i == curPoint.x ) && ( j == curPoint.y ) ) { continue; }
                        else if ( !complete ) { complete = ( i ==x ) && ( j==y ); }
                        else break;
-                       tKey = 'key' + i + j;
+                       tKey = 'key' + i +'|'+ j;
                        if ( tKey in closeList ) { continue; }
                        if ( tKey in openList ) {
                           if ( ( curPoint.x == openList[tKey].x ) ||
@@ -115,7 +115,7 @@
                        }   
                    }
            }
-           return openList['key' + x + y ];
+           return openList['key' + x +'|'+ y ];
        }
 
        var canvas = document.querySelector("canvas") ;
